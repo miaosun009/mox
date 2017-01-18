@@ -1,18 +1,45 @@
+const Koa = require('koa');
+const app = new Koa();
+const router = require('koa-router')();
+const views = require('koa-views');
+const co = require('co');
+const convert = require('koa-convert');
+const json = require('koa-json');
+const onerror = require('koa-onerror');
+const bodyparser = require('koa-bodyparser')();
+const logger = require('koa-logger');
 
-/**
- * Module dependencies.
- */
+const index = require('./routes/index');
+const users = require('./routes/users');
 
-var express = require("express");
-var app     = express();
-var path    = require("path");
+// middlewares
+app.use(convert(bodyparser));
+app.use(convert(json()));
+app.use(convert(logger()));
+app.use(require('koa-static')(__dirname + '/public'));
 
+app.use(views(__dirname + '/views', {
+  extension: 'jade'
+}));
 
-app.get('/',function(req,res){
-  res.sendFile(path.join(__dirname+'/index.html'));
-  //__dirname : It will resolve to your project folder.
+// logger
+app.use(async (ctx, next) => {
+  const start = new Date();
+  await next();
+  const ms = new Date() - start;
+  console.log(`${ctx.method} ${ctx.url} - ${ms}ms`);
 });
 
-app.listen(80);
+router.use('/', index.routes(), index.allowedMethods());
+router.use('/users', users.routes(), users.allowedMethods());
 
-console.log("Express server listening on port %d in %s mode", 80, app.settings.env);
+app.use(router.routes(), router.allowedMethods());
+// response
+
+app.on('error', function(err, ctx){
+  console.log(err)
+  logger.error('server error', err, ctx);
+});
+
+
+module.exports = app;
